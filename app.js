@@ -1,44 +1,37 @@
-<?php
-// webhook.php
+// Import Express.js
+const express = require('express');
 
-// Verify token (used during webhook setup)
-$verify_token = "YOUR_VERIFY_TOKEN";
+// Create an Express app
+const app = express();
 
-// Handle the GET request (for webhook verification)
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $mode = $_GET['hub_mode'] ?? '';
-    $token = $_GET['hub_verify_token'] ?? '';
-    $challenge = $_GET['hub_challenge'] ?? '';
+// Middleware to parse JSON bodies
+app.use(express.json());
 
-    if ($mode === 'subscribe' && $token === $verify_token) {
-        // Verification success
-        echo $challenge;
-        exit;
-    } else {
-        // Verification failed
-        http_response_code(403);
-        echo "Forbidden";
-        exit;
-    }
-}
+// Set port and verify_token
+const port = process.env.PORT || 3000;
+const verifyToken = process.env.VERIFY_TOKEN;
 
-// Handle the POST request (for incoming webhook events)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Get the POST body content
-    $input = file_get_contents('php://input');
+// Route for GET requests
+app.get('/', (req, res) => {
+  const { 'hub.mode': mode, 'hub.challenge': challenge, 'hub.verify_token': token } = req.query;
 
-    // Decode JSON
-    $data = json_decode($input, true);
+  if (mode === 'subscribe' && token === verifyToken) {
+    console.log('WEBHOOK VERIFIED');
+    res.status(200).send(challenge);
+  } else {
+    res.status(403).end();
+  }
+});
 
-    // Log or process the webhook data
-    file_put_contents('webhook_log.txt', print_r($data, true), FILE_APPEND);
+// Route for POST requests
+app.post('/', (req, res) => {
+  const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  console.log(`\n\nWebhook received ${timestamp}\n`);
+  console.log(JSON.stringify(req.body, null, 2));
+  res.status(200).end();
+});
 
-    // Send a 200 OK response back to Meta
-    http_response_code(200);
-    echo "EVENT_RECEIVED";
-    exit;
-}
-
-// If method not GET or POST
-http_response_code(405);
-echo "Method Not Allowed";
+// Start the server
+app.listen(port, () => {
+  console.log(`\nListening on port ${port}\n`);
+});
